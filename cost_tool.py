@@ -5,6 +5,15 @@ Aircraft Direct Operating Cost Tool
 Author: Gabriel Bortoletto Molz
 Based on: AEA 1989a/b method (Association of European Airlines)
 Date: February 5, 2026
+
+Usage:
+    # Use default AEA 1989a parameters
+    params = MethodParameters()
+    result = calculate_costs(aircraft_params, params)
+    
+    # Use fitted parameters (calibrated to regional jets)
+    params = MethodParameters(maintenance=FITTED_MAINTENANCE_PARAMS)
+    result = calculate_costs(aircraft_params, params)
 """
 
 from dataclasses import dataclass
@@ -49,6 +58,89 @@ class AircraftParameters:
 
 
 @dataclass
+class MaintenanceParameters:
+    """Maintenance cost model parameters (AEA 1989a method).
+    
+    All coefficients and constants used in airframe and engine maintenance
+    cost calculations. These parameters can be tuned to fit empirical data.
+    """
+    # Airframe maintenance - labor hours calculation
+    airframe_labor_weight_coefficient: float = 9e-5  # Weight-based labor coefficient [h/kg]
+    airframe_labor_base_hours: float = 6.7  # Base labor hours constant [h]
+    airframe_labor_weight_numerator_kg: float = 350000  # Weight formula numerator [kg]
+    airframe_labor_weight_denominator_offset_kg: float = 75000  # Weight formula offset [kg]
+    airframe_labor_time_base_factor: float = 0.8  # Base time scaling factor
+    airframe_labor_time_coefficient: float = 0.68  # Flight time multiplier
+    
+    # Airframe maintenance - material cost calculation
+    airframe_material_base_coefficient: float = 4.2e-6  # Base material cost fraction
+    airframe_material_time_coefficient: float = 2.2e-6  # Time-dependent material cost fraction
+    
+    # Engine k-factors - k1 (bypass ratio dependency)
+    engine_k1_base: float = 1.27  # k1 base value
+    engine_k1_bpr_coefficient: float = 0.2  # Bypass ratio coefficient for k1
+    engine_k1_bpr_exponent: float = 0.2  # Bypass ratio exponent for k1
+    
+    # Engine k-factors - k2 (pressure ratio dependency)
+    engine_k2_base: float = 0.4  # k2 base value
+    engine_k2_opr_coefficient: float = 0.4  # Overall pressure ratio coefficient
+    engine_k2_opr_exponent: float = 1.3  # Overall pressure ratio exponent
+    engine_k2_opr_divisor: float = 20  # Overall pressure ratio divisor
+    
+    # Engine k-factors - k4 (shaft configuration dependency)
+    engine_k4_single_shaft: float = 0.5  # k4 for single-shaft engines
+    engine_k4_twin_shaft: float = 0.57  # k4 for twin-shaft engines
+    engine_k4_triple_shaft: float = 0.64  # k4 for triple-shaft engines
+    
+    # Engine k-factors - k3 (compressor stages dependency)
+    engine_k3_compressor_coefficient: float = 0.032  # Compressor stage coefficient
+    
+    # Engine maintenance - labor hours calculation
+    engine_labor_base_coefficient: float = 0.17  # Base labor coefficient (AEA 1989a uses 0.17, some sources cite 0.21)
+    engine_labor_thrust_coefficient: float = 1.02e-4  # Thrust scaling coefficient [1/N]
+    engine_labor_thrust_exponent: float = 0.4  # Thrust exponent for labor hours
+    engine_labor_flight_time_constant: float = 1.3  # Flight time constant for labor
+    
+    # Engine maintenance - material cost calculation
+    engine_material_base_coefficient: float = 2.0  # Base material coefficient (AEA 1989a uses 2.0, some sources cite 2.56)
+    engine_material_thrust_exponent: float = 0.8  # Thrust exponent for material cost
+    engine_material_flight_time_constant: float = 1.3  # Flight time constant for material
+
+
+# Fitted maintenance parameters (calibrated to 3 regional jets: ERJ-145 XR, CRJ-700, CRJ-200)
+# Optimization achieved RMSE of $21.75 across all aircraft with 10-parameter fitting
+# Use this instead of defaults for improved accuracy on regional jet maintenance costs
+FITTED_MAINTENANCE_PARAMS = MaintenanceParameters(
+    airframe_labor_base_hours=7.677337282966461,
+    airframe_labor_time_base_factor=0.1,
+    airframe_labor_time_coefficient=0.8590882764848947,
+    airframe_labor_weight_coefficient=1e-06,
+    airframe_labor_weight_denominator_offset_kg=74999.77106224232,
+    airframe_labor_weight_numerator_kg=349999.964837715,
+    airframe_material_base_coefficient=4.2e-06,
+    airframe_material_time_coefficient=2.2e-06,
+    engine_k1_base=0.5,
+    engine_k1_bpr_coefficient=0.2,
+    engine_k1_bpr_exponent=0.2,
+    engine_k2_base=0.4,
+    engine_k2_opr_coefficient=0.4,
+    engine_k2_opr_divisor=20,
+    engine_k2_opr_exponent=0.5000000033638023,
+    engine_k3_compressor_coefficient=0.032,
+    engine_k4_single_shaft=0.5,
+    engine_k4_triple_shaft=0.64,
+    engine_k4_twin_shaft=0.57,
+    engine_labor_base_coefficient=0.05,
+    engine_labor_flight_time_constant=1.3,
+    engine_labor_thrust_coefficient=0.000102,
+    engine_labor_thrust_exponent=0.4,
+    engine_material_base_coefficient=2.0,
+    engine_material_flight_time_constant=1.3,
+    engine_material_thrust_exponent=0.40000000060154356,
+)
+
+
+@dataclass
 class MethodParameters:
     """Cost calculation method parameters.
     
@@ -71,7 +163,7 @@ class MethodParameters:
     insurance_factor: float = 0.005  # k_ins, fraction of delivery price
     
     # Inflation
-    inflation_rate: float = 0.013  # p_inf 1.3% average annual yields good results
+    inflation_rate: float = 0.027  # p_inf 2.7% average annual yields good results
     
     # Fuel
     fuel_price_usd: float = 0.888 * 0.7 # fuel price [USD/kg] 0.888 usd per kg = 2.7 usd per gal
@@ -82,6 +174,12 @@ class MethodParameters:
     
     # Maintenance
     labor_rate_usd_per_hour: float = 65 # [USD/hour] 65 is the value for 1989 labor rate
+    maintenance: MaintenanceParameters = None  # Maintenance model parameters
+    
+    def __post_init__(self):
+        """Initialize maintenance parameters with defaults if not provided."""
+        if self.maintenance is None:
+            self.maintenance = MaintenanceParameters()
 
     # Crew
     cabin_crew_rate_usd_per_hour : float = 0 # [USD/hour] estimated cabin crew cost per hour
@@ -475,14 +573,16 @@ def calculate_maintenance(
         # Common parameters
         flights_per_year: int,
         labor_rate_usd_per_hour: float,
-        inflation_factor: float
+        inflation_factor: float,
+        # Model parameters
+        params: MaintenanceParameters
 ) -> float:
     """Calculate total maintenance cost (airframe + engine).
-    This is the most complicated shit took me a few hours...
     
     Functionality:
         Calculates combined airframe and engine maintenance costs based on
         aircraft characteristics and utilization. Based on AEA 1989a method.
+        All model coefficients are now parameterized for easy fitting to empirical data.
         
     Args:
         flight_time_hours: Flight time per mission [h]
@@ -497,56 +597,62 @@ def calculate_maintenance(
         flights_per_year: Number of flights per year
         labor_rate_usd_per_hour: Maintenance labor rate [USD/h]
         inflation_factor: Inflation adjustment factor k_INF
+        params: Maintenance model parameters (all coefficients and constants)
         
     Returns:
         float: Total annual maintenance cost (airframe + engine) [USD/year]
         
     Formulas (AEA 1989a):
         Airframe:
-            t_M,AF,f = (1/t_f) * (9·10^-5 * m_AF + 6.7 * 350000/(m_AF + 75000)) * (0.8 + 0.68*t_f)
-            C_M,M,AF,f = (1/t_f) * (4.2·10^-6 + 2.2·10^-6 * t_f) * P_AF
+            t_M,AF,f = (1/t_f) * (c1*m_AF + c2 - c3/(m_AF + c4)) * (c5 + c6*t_f)
+            C_M,M,AF,f = (1/t_f) * (c7 + c8*t_f) * P_AF
         Engine:
-            t_M,E,f = n_E · 0.21 · k_1 · k_3 · (1 + 1.02·10^-4 · T_TO,E)^0.4 · (1 + 1.3/t_f)
-            C_M,M,E,f = n_E · 2.56 · k_1 · (k_2 + k_3) · (1 + 1.02·10^-4 · T_TO,E)^0.8 · (1 + 1.3/t_f) · k_INF
+            k1 = c9 - c10 * BPR^c11
+            k2 = c12 * OAPR^c13 / c14 + c12
+            k3 = c15 * n_c + k4  (where k4 depends on shaft count)
+            t_M,E,f = n_E * c16 * k1 * k3 * (1 + c17*T_TO,E)^c18 * (1 + c19/t_f)
+            C_M,M,E,f = n_E * c20 * k1 * (k2 + k3) * (1 + c17*T_TO,E)^c21 * (1 + c22/t_f) * k_INF
     """
     # AIRFRAME MAINTENANCE
     # Maintenance labor hours per flight
     t_M_AF_f = (1 / flight_time_hours * 
-                (9e-5 * airframe_weight_kg + 6.7 - 350000 / (airframe_weight_kg + 75000)) * 
-                (0.8 + 0.68 * flight_time_hours))
+                (params.airframe_labor_weight_coefficient * airframe_weight_kg + 
+                 params.airframe_labor_base_hours - 
+                 params.airframe_labor_weight_numerator_kg / (airframe_weight_kg + params.airframe_labor_weight_denominator_offset_kg)) * 
+                (params.airframe_labor_time_base_factor + params.airframe_labor_time_coefficient * flight_time_hours))
     
-    # Maintenance cost per flight
+    # Maintenance material cost per flight
     C_M_M_AF_f = (1 / flight_time_hours * 
-                  (4.2e-6 + 2.2e-6 * flight_time_hours) * 
+                  (params.airframe_material_base_coefficient + params.airframe_material_time_coefficient * flight_time_hours) * 
                   airframe_price_usd)
     
     # ENGINE MAINTENANCE
-    # Calculate k-factors
-    k1 = 1.27 - 0.2 * bypass_ratio ** 0.2
-    k2 = 0.4 * overall_pressure_ratio ** 1.3 / 20 + 0.4
+    # Calculate k-factors with parameterized coefficients
+    k1 = params.engine_k1_base - params.engine_k1_bpr_coefficient * bypass_ratio ** params.engine_k1_bpr_exponent
+    k2 = params.engine_k2_opr_coefficient * overall_pressure_ratio ** params.engine_k2_opr_exponent / params.engine_k2_opr_divisor + params.engine_k2_base
     
     # k4 depends on number of engine shafts
     match engine_shafts:
         case 1:
-            k4 = 0.5  # Single-shaft engine value
+            k4 = params.engine_k4_single_shaft
         case 2:
-            k4 = 0.57  # Twin-shaft engine value
+            k4 = params.engine_k4_twin_shaft
         case 3:
-            k4 = 0.64  # Triple-shaft engine value
+            k4 = params.engine_k4_triple_shaft
         case _:
             raise ValueError(f"engine_shafts must be 1, 2, or 3, got {engine_shafts}")
     
-    k3 = 0.032 * compressor_stages + k4
+    k3 = params.engine_k3_compressor_coefficient * compressor_stages + k4
     
     # Maintenance labor hours per flight
-    t_M_E_f = (engine_count * 0.17 * k1 * k3 * 
-               (1 + 1.02e-4 * takeoff_thrust_per_engine_N) ** 0.4 * 
-               (1 + 1.3 / flight_time_hours))
+    t_M_E_f = (engine_count * params.engine_labor_base_coefficient * k1 * k3 * 
+               (1 + params.engine_labor_thrust_coefficient * takeoff_thrust_per_engine_N) ** params.engine_labor_thrust_exponent * 
+               (1 + params.engine_labor_flight_time_constant / flight_time_hours))
     
-    # Maintenance cost per flight
-    C_M_M_E_f = (engine_count * 2.0 * k1 * (k2 + k3) * 
-                 (1 + 1.02e-4 * takeoff_thrust_per_engine_N) ** 0.8 * 
-                 (1 + 1.3 / flight_time_hours) * inflation_factor)
+    # Maintenance material cost per flight
+    C_M_M_E_f = (engine_count * params.engine_material_base_coefficient * k1 * (k2 + k3) * 
+                 (1 + params.engine_labor_thrust_coefficient * takeoff_thrust_per_engine_N) ** params.engine_material_thrust_exponent * 
+                 (1 + params.engine_material_flight_time_constant / flight_time_hours) * inflation_factor)
     
     # Total maintenance cost
     return ((t_M_AF_f + t_M_E_f) * labor_rate_usd_per_hour + C_M_M_AF_f + C_M_M_E_f) * flight_time_hours * flights_per_year
@@ -776,7 +882,8 @@ def calculate_costs(
         aircraft.engine_count,
         aircraft.flights_per_year,
         labor_rate_target_year,
-        inflation_factor
+        inflation_factor,
+        params.maintenance
     )
     
     crew = calculate_crew(

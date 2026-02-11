@@ -20,33 +20,33 @@ def hhmmss_to_hours(time_str):
     return h + m/60 + s/3600
 
 
-airplane = dt.standard_airplane('ERJ_145_XR')
+airplane = dt.standard_airplane('CRJ200')
 airplane = dt.analyze(airplane)
 
-# ========== ERJ_145_XR Aircraft Configuration ==========
-erj_145_xr = AircraftParameters(
+# ========== CRJ_200 Aircraft Configuration ==========
+crj_200 = AircraftParameters(
     # Utilization
     block_time_hours=hhmmss_to_hours("2:20:00"),                    # Average block time per flight
-    flight_time_hours=hhmmss_to_hours("2:05:13"),                   # Average flight time per flight
+    flight_time_hours=hhmmss_to_hours("1:53:57"),                   # Average flight time per flight
     flights_per_year=1, # THIS DOESNT MATTER
     
     # Weights
-    maximum_takeoff_weight_kg=48501 / 2.205,        # MTOW
-    operational_empty_weight_kg=27550 / 2.205,      # OEW
+    maximum_takeoff_weight_kg=53000 / 2.205,        # MTOW
+    operational_empty_weight_kg=31904 / 2.205,      # OEW
     engine_weight_kg=751.6,
-    fuel_weight_kg=2664,                    # Fuel per flight (average)
-    payload_weight_kg=5403,                # Typical payload
+    fuel_weight_kg=2650,                    # Fuel per flight (average)
+    payload_weight_kg=5487,                # Typical payload
     
     # Mission
     range_nm=689,                          # Average stage length
     
     # Engine specifications
     engine_count=2,
-    bypass_ratio=4.7,
-    overall_pressure_ratio=20,
-    compressor_stages=9,
+    bypass_ratio=6.2,
+    overall_pressure_ratio=14,
+    compressor_stages=14,
     engine_shafts=2,
-    takeoff_thrust_per_engine_N=39670,
+    takeoff_thrust_per_engine_N=41000,
     
     # Crew
     cockpit_crew_count=2,
@@ -92,14 +92,14 @@ fitted_maintenance_params = MaintenanceParameters(
 params = MethodParameters(maintenance=fitted_maintenance_params)
 
 # ========== Calculate Direct Operating Costs ==========
-erj_145_xr_result = calculate_costs(erj_145_xr, params, target_year=2025)
+crj_200_result = calculate_costs(crj_200, params, target_year=2025)
 
-print("\n========== Cost Breakdown (Per Flight) ERJ-145 XR ==========")
-print(f"OEW: {erj_145_xr.operational_empty_weight_kg:.2f} kg - {erj_145_xr.operational_empty_weight_kg * 2.20462:.2f} lbs")
-print(f"MTOW: {erj_145_xr.maximum_takeoff_weight_kg:.2f} kg - {erj_145_xr.maximum_takeoff_weight_kg * 2.20462:.2f} lbs")
-print(f"Fees & Charges:  ${erj_145_xr_result.per_flight.fees_and_charges:,.2f}")
-print(f"Crew:            ${erj_145_xr_result.per_flight.crew:,.2f}")
-print(f"Maintenance:     ${erj_145_xr_result.per_flight.maintenance:,.2f}")
-print(f"Fuel:            ${erj_145_xr_result.per_flight.fuel:,.2f}")
-print(f"Cash Operating Cost Per Flight: ${erj_145_xr_result.per_flight.fees_and_charges + erj_145_xr_result.per_flight.crew + erj_145_xr_result.per_flight.maintenance + erj_145_xr_result.per_flight.fuel:,.2f}")
+print("\n========== Cost Breakdown (Per Flight) CRJ-200 ==========")
+print(f"OEW: {crj_200.operational_empty_weight_kg:.2f} kg - {crj_200.operational_empty_weight_kg * 2.20462:.2f} lbs")
+print(f"MTOW: {crj_200.maximum_takeoff_weight_kg:.2f} kg - {crj_200.maximum_takeoff_weight_kg * 2.20462:.2f} lbs")
+print(f"Fees & Charges:  ${crj_200_result.per_flight.fees_and_charges:,.2f}")
+print(f"Crew:            ${crj_200_result.per_flight.crew:,.2f}")
+print(f"Maintenance:     ${crj_200_result.per_flight.maintenance:,.2f}")
+print(f"Fuel:            ${crj_200_result.per_flight.fuel:,.2f}")
+print(f"Cash Operating Cost Per Flight: ${crj_200_result.per_flight.fees_and_charges + crj_200_result.per_flight.crew + crj_200_result.per_flight.maintenance + crj_200_result.per_flight.fuel:,.2f}")
 print(f"{'='*50}")

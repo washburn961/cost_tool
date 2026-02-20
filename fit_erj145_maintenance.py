@@ -16,7 +16,7 @@ Labor rate is NOT modified - only maintenance model coefficients.
 import numpy as np
 from scipy.optimize import minimize
 from dataclasses import replace
-from cost_tool import AircraftParameters, MethodParameters, MaintenanceParameters, calculate_costs
+from cost_tool import FITTED_MAINTENANCE_PARAMS, AircraftParameters, MethodParameters, MaintenanceParameters, calculate_costs
 
 
 def hhmmss_to_hours(time_str):
@@ -27,19 +27,19 @@ def hhmmss_to_hours(time_str):
 # ========== ERJ-145 XR Configuration (from e145_example.py) ==========
 erj_145_xr = AircraftParameters(
     # Utilization
-    block_time_hours=hhmmss_to_hours("2:20:00"),
-    flight_time_hours=hhmmss_to_hours("2:05:13"),
-    flights_per_year=1200,  # Need non-zero value for calculation
+    block_time_hours=hhmmss_to_hours("2:05:00"),                    # Average block time per flight
+    flight_time_hours=hhmmss_to_hours("1:34:00"),                   # Average flight time per flight
+    flights_per_year=1, # THIS DOESNT MATTER
     
     # Weights
-    maximum_takeoff_weight_kg=48501 / 2.205,
-    operational_empty_weight_kg=27550 / 2.205,
+    maximum_takeoff_weight_kg=48501 / 2.205,        # MTOW
+    operational_empty_weight_kg=27550 / 2.205,      # OEW
     engine_weight_kg=751.6,
-    fuel_weight_kg=2664,
-    payload_weight_kg=5403,
+    fuel_weight_kg=1731,                    # Trip fuel
+    payload_weight_kg=3800,                # Typical payload for 80% load factor
     
     # Mission
-    range_nm=689,
+    range_nm=654,                          # Stage length
     
     # Engine specifications
     engine_count=2,
@@ -52,6 +52,10 @@ erj_145_xr = AircraftParameters(
     # Crew
     cockpit_crew_count=2,
     cabin_crew_count=1,
+    
+    # Pricing (optional - will be estimated if not provided)
+    aircraft_delivery_price_usd=None,        # Will be estimated from OEW
+    engine_price_usd=None                    # Will be estimated from thrust
 )
 
 # ========== CRJ-700 Configuration (from crj700.py) ==========
@@ -122,12 +126,13 @@ TARGET_CRJ200 = 1250.0  # USD per flight
 # Create aircraft list
 aircraft_data = [
     {"name": "ERJ-145 XR", "aircraft": erj_145_xr, "target": TARGET_ERJ145},
-    {"name": "CRJ-700", "aircraft": crj_700, "target": TARGET_CRJ700},
-    {"name": "CRJ-200", "aircraft": crj_200, "target": TARGET_CRJ200},
+    # {"name": "CRJ-700", "aircraft": crj_700, "target": TARGET_CRJ700},
+    # {"name": "CRJ-200", "aircraft": crj_200, "target": TARGET_CRJ200},
 ]
 
 # Base parameters (DO NOT modify labor_rate_usd_per_hour!)
 base_params = MethodParameters()
+base_params.maintenance = FITTED_MAINTENANCE_PARAMS
 
 print("\n" + "="*70)
 print("FITTING MAINTENANCE MODEL TO MULTIPLE AIRCRAFT")

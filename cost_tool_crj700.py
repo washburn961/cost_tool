@@ -9,7 +9,7 @@ This example demonstrates the calculation of Direct Operating Costs (DOC)
 for a representative narrow-body commercial aircraft (Boeing 737-800 class).
 """
 
-import designTool_learis as dt
+# import designTool_learis as dt
 import matplotlib.pyplot as plt
 import numpy as np
 from cost_tool import FITTED_MAINTENANCE_PARAMS, AircraftParameters, MethodParameters, calculate_costs

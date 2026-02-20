@@ -166,7 +166,7 @@ class MethodParameters:
     inflation_rate: float = 0.027  # p_inf 2.7% average annual yields good results
     
     # Fuel
-    fuel_price_usd: float = 0.888 * 0.7 # fuel price [USD/kg] 0.888 usd per kg = 2.7 usd per gal
+    fuel_price_usd: float = 1 # fuel price [USD/kg] 1 usd per kg = 3 usd per gal
 
     # Engine installation
     installed_engine_factor: float = 1.15 # 1.15 for jet engines in transport airplanes

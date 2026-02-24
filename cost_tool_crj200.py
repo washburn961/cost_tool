@@ -9,7 +9,7 @@ This example demonstrates the calculation of Direct Operating Costs (DOC)
 for a representative narrow-body commercial aircraft (Boeing 737-800 class).
 """
 
-import designTool_learis as dt
+# import designTool_learis as dt
 import matplotlib.pyplot as plt
 import numpy as np
 from cost_tool import AircraftParameters, MethodParameters, MaintenanceParameters, calculate_costs
@@ -20,8 +20,8 @@ def hhmmss_to_hours(time_str):
     return h + m/60 + s/3600
 
 
-airplane = dt.standard_airplane('CRJ200')
-airplane = dt.analyze(airplane)
+# airplane = dt.standard_airplane('CRJ200')
+# airplane = dt.analyze(airplane)
 
 # ========== CRJ_200 Aircraft Configuration ==========
 crj_200 = AircraftParameters(

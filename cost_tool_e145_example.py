@@ -9,10 +9,10 @@ This example demonstrates the calculation of Direct Operating Costs (DOC)
 for a representative narrow-body commercial aircraft (Boeing 737-800 class).
 """
 
-import designTool_learis as dt
+# import designTool_learis as dt
 import matplotlib.pyplot as plt
 import numpy as np
-from cost_tool import AircraftParameters, MethodParameters, MaintenanceParameters, calculate_costs
+import cost_tool as ct
 
 
 def hhmmss_to_hours(time_str):
@@ -20,25 +20,25 @@ def hhmmss_to_hours(time_str):
     return h + m/60 + s/3600
 
 
-airplane = dt.standard_airplane('ERJ_145_XR')
-airplane = dt.analyze(airplane)
+# airplane = dt.standard_airplane('ERJ_145_XR')
+# airplane = dt.analyze(airplane)
 
 # ========== ERJ_145_XR Aircraft Configuration ==========
-erj_145_xr = AircraftParameters(
+erj_145_xr = ct.AircraftParameters(
     # Utilization
-    block_time_hours=hhmmss_to_hours("2:20:00"),                    # Average block time per flight
-    flight_time_hours=hhmmss_to_hours("2:05:13"),                   # Average flight time per flight
+    block_time_hours=hhmmss_to_hours("2:05:00"),                    # Average block time per flight
+    flight_time_hours=hhmmss_to_hours("1:34:00"),                   # Average flight time per flight
     flights_per_year=1, # THIS DOESNT MATTER
     
     # Weights
     maximum_takeoff_weight_kg=48501 / 2.205,        # MTOW
     operational_empty_weight_kg=27550 / 2.205,      # OEW
     engine_weight_kg=751.6,
-    fuel_weight_kg=2664,                    # Fuel per flight (average)
-    payload_weight_kg=5403,                # Typical payload
+    fuel_weight_kg=1731,                    # Trip fuel
+    payload_weight_kg=3800,                # Typical payload for 80% load factor
     
     # Mission
-    range_nm=689,                          # Average stage length
+    range_nm=654,                          # Stage length
     
     # Engine specifications
     engine_count=2,
@@ -60,39 +60,12 @@ erj_145_xr = AircraftParameters(
 # ========== Method Parameters (Fitted to 3 Regional Jets) ==========
 # Fitted simultaneously to ERJ-145 XR ($1,350), CRJ-700 ($1,450), CRJ-200 ($1,250)
 # 10 parameters optimized, Overall RMSE: $21.75 across all aircraft
-fitted_maintenance_params = MaintenanceParameters(
-    airframe_labor_base_hours=7.677337282966461,
-    airframe_labor_time_base_factor=0.1,
-    airframe_labor_time_coefficient=0.8590882764848947,
-    airframe_labor_weight_coefficient=1e-06,
-    airframe_labor_weight_denominator_offset_kg=74999.77106224232,
-    airframe_labor_weight_numerator_kg=349999.964837715,
-    airframe_material_base_coefficient=4.2e-06,
-    airframe_material_time_coefficient=2.2e-06,
-    engine_k1_base=0.5,
-    engine_k1_bpr_coefficient=0.2,
-    engine_k1_bpr_exponent=0.2,
-    engine_k2_base=0.4,
-    engine_k2_opr_coefficient=0.4,
-    engine_k2_opr_divisor=20,
-    engine_k2_opr_exponent=0.5000000033638023,
-    engine_k3_compressor_coefficient=0.032,
-    engine_k4_single_shaft=0.5,
-    engine_k4_triple_shaft=0.64,
-    engine_k4_twin_shaft=0.57,
-    engine_labor_base_coefficient=0.05,
-    engine_labor_flight_time_constant=1.3,
-    engine_labor_thrust_coefficient=0.000102,
-    engine_labor_thrust_exponent=0.4,
-    engine_material_base_coefficient=2.0,
-    engine_material_flight_time_constant=1.3,
-    engine_material_thrust_exponent=0.40000000060154356,
-)
+fitted_maintenance_params = ct.FITTED_MAINTENANCE_PARAMS
 
-params = MethodParameters(maintenance=fitted_maintenance_params)
+params = ct.MethodParameters(maintenance=fitted_maintenance_params)
 
 # ========== Calculate Direct Operating Costs ==========
-erj_145_xr_result = calculate_costs(erj_145_xr, params, target_year=2025)
+erj_145_xr_result = ct.calculate_costs(erj_145_xr, params, target_year=2025)
 
 print("\n========== Cost Breakdown (Per Flight) ERJ-145 XR ==========")
 print(f"OEW: {erj_145_xr.operational_empty_weight_kg:.2f} kg - {erj_145_xr.operational_empty_weight_kg * 2.20462:.2f} lbs")

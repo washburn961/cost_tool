@@ -17,6 +17,7 @@ Usage:
 """
 
 from dataclasses import dataclass
+import numpy as np
 
 
 @dataclass
@@ -746,6 +747,7 @@ def calculate_costs(
     aircraft: AircraftParameters,
     params: MethodParameters,
     target_year: int = 2026,
+    verbose: bool = False
 ) -> DOCResult:
     """Calculate complete Direct Operating Cost breakdown.
     
@@ -774,28 +776,82 @@ def calculate_costs(
     """
     
     # ========== PHASE 0: Inflation Factors ==========
+    if verbose:
+        print("\n" + "="*80)
+        print("PHASE 0: INFLATION FACTORS & UTILIZATION")
+        print("="*80)
+    
     # General inflation factor (1989 -> target_year)
     inflation_factor = calculate_inflation_factor(
         params.inflation_rate,
         target_year,
         1989
     )
+    
+    if verbose:
+        print(f"\nInflation calculation (1989 → {target_year}):")
+        print(f"  Inflation rate: {params.inflation_rate:.4f} ({params.inflation_rate*100:.2f}%)")
+        print(f"  Years elapsed: {target_year - 1989}")
+        print(f"  Inflation factor: {inflation_factor:.4f}")
 
     labor_rate_target_year = params.labor_rate_usd_per_hour * inflation_factor
     
+    if verbose:
+        print(f"\nLabor rate adjustment:")
+        print(f"  Base labor rate (1989): ${params.labor_rate_usd_per_hour:.2f}/hour")
+        print(f"  Target year labor rate: ${labor_rate_target_year:.2f}/hour")
+    
+    # Estimate annual utilization if not provided
+    if aircraft.flights_per_year is None:
+        if verbose:
+            print(f"\nEstimating annual utilization (flights_per_year not provided):")
+            print(f"  Block time: {aircraft.block_time_hours:.2f} hours")
+        
+        Uannbl = 1000 * (3.4546 * aircraft.block_time_hours + 2.994 - 
+                         np.sqrt(12.289 * aircraft.block_time_hours**2 - 
+                                5.6626 * aircraft.block_time_hours + 8.964))
+        flights_per_year = Uannbl / aircraft.block_time_hours
+        
+        if verbose:
+            print(f"  Annual block hours (Uannbl): {Uannbl:.2f} hours/year")
+            print(f"  Estimated flights per year: {flights_per_year:.2f}")
+    else:
+        flights_per_year = aircraft.flights_per_year
+        if verbose:
+            print(f"\nUsing provided annual utilization:")
+            print(f"  Flights per year: {flights_per_year:.2f}")
+    
     # ========== PHASE 1: Pricing Estimation ==========
+    if verbose:
+        print("\n" + "="*80)
+        print("PHASE 1: PRICING ESTIMATION")
+        print("="*80)
+    
     # Estimate or use provided engine price
     if aircraft.engine_price_usd is not None:
         engine_price_usd = aircraft.engine_price_usd
+        if verbose:
+            print(f"\nUsing provided engine price:")
+            print(f"  Engine price: ${engine_price_usd:,.2f} per engine")
     else:
         # Estimate from thrust (1999 baseline) and inflate to target year
         engine_price_1999 = estimate_engine_price(aircraft.takeoff_thrust_per_engine_N)
         engine_inflation = calculate_inflation_factor(params.inflation_rate, target_year, 1999)
         engine_price_usd = engine_price_1999 * engine_inflation
+        
+        if verbose:
+            print(f"\nEstimating engine price from thrust:")
+            print(f"  Takeoff thrust per engine: {aircraft.takeoff_thrust_per_engine_N:,.0f} N")
+            print(f"  Estimated price (1999): ${engine_price_1999:,.2f}")
+            print(f"  Inflation factor (1999 → {target_year}): {engine_inflation:.4f}")
+            print(f"  Adjusted engine price: ${engine_price_usd:,.2f} per engine")
     
     # Estimate or use provided delivery price
     if aircraft.aircraft_delivery_price_usd is not None:
         delivery_price_usd = aircraft.aircraft_delivery_price_usd
+        if verbose:
+            print(f"\nUsing provided delivery price:")
+            print(f"  Delivery price: ${delivery_price_usd:,.2f}")
     else:
         # Estimate from OEW (2010 baseline) and inflate to target year
         # delivery_price_1999 = calculate_delivery_price_from_oew(
@@ -809,6 +865,13 @@ def calculate_costs(
         delivery_price_1999 = 860 * aircraft.operational_empty_weight_kg
         delivery_inflation = calculate_inflation_factor(params.inflation_rate, target_year, 1999)
         delivery_price_usd = delivery_price_1999 * delivery_inflation
+        
+        if verbose:
+            print(f"\nEstimating delivery price from OEW:")
+            print(f"  Operational empty weight: {aircraft.operational_empty_weight_kg:,.0f} kg")
+            print(f"  Estimated price (1999): ${delivery_price_1999:,.2f} (using $860/kg factor)")
+            print(f"  Inflation factor (1999 → {target_year}): {delivery_inflation:.4f}")
+            print(f"  Adjusted delivery price: ${delivery_price_usd:,.2f}")
     
     # Calculate airframe price (delivery minus engines)
     airframe_price_usd = calculate_airframe_price(
@@ -816,6 +879,12 @@ def calculate_costs(
         engine_price_usd,
         aircraft.engine_count
     )
+    
+    if verbose:
+        print(f"\nAirframe price calculation:")
+        print(f"  Delivery price: ${delivery_price_usd:,.2f}")
+        print(f"  Engine price × {aircraft.engine_count} engines: ${engine_price_usd * aircraft.engine_count:,.2f}")
+        print(f"  Airframe price: ${airframe_price_usd:,.2f}")
     
     # Calculate spares price
     spares_price_usd = calculate_spares_price(
@@ -826,10 +895,24 @@ def calculate_costs(
         params.engine_spares_factor
     )
     
+    if verbose:
+        print(f"\nSpares investment calculation:")
+        print(f"  Airframe spares ({params.airframe_spares_factor*100:.1f}%): ${airframe_price_usd * params.airframe_spares_factor:,.2f}")
+        print(f"  Engine spares ({params.engine_spares_factor*100:.1f}%): ${engine_price_usd * aircraft.engine_count * params.engine_spares_factor:,.2f}")
+        print(f"  Total spares: ${spares_price_usd:,.2f}")
+    
     # Calculate total purchase price
     purchase_price_usd = calculate_purchase_price(delivery_price_usd, spares_price_usd)
     
+    if verbose:
+        print(f"\nTotal purchase price:")
+        print(f"  Delivery + Spares: ${purchase_price_usd:,.2f}")
+    
     # ========== PHASE 2: Weight Calculations ==========
+    if verbose:
+        print("\n" + "="*80)
+        print("PHASE 2: WEIGHT CALCULATIONS")
+        print("="*80)
     
     installed_engine_weight_kg = calculate_installed_engine_weight(
         params.installed_engine_factor,
@@ -838,17 +921,43 @@ def calculate_costs(
         aircraft.engine_count
     )
     
+    if verbose:
+        print(f"\nInstalled engine weight:")
+        print(f"  Bare engine weight: {aircraft.engine_weight_kg:,.0f} kg per engine")
+        print(f"  Installation factor: {params.installed_engine_factor:.2f}")
+        print(f"  Reverse thrust factor: {params.installed_engine_reverse_factor:.2f}")
+        print(f"  Number of engines: {aircraft.engine_count}")
+        print(f"  Total installed engine weight: {installed_engine_weight_kg:,.0f} kg")
+    
     airframe_weight_kg = calculate_airframe_weight(
         aircraft.operational_empty_weight_kg,
         installed_engine_weight_kg
     )
     
+    if verbose:
+        print(f"\nAirframe weight:")
+        print(f"  Operational empty weight: {aircraft.operational_empty_weight_kg:,.0f} kg")
+        print(f"  Installed engine weight: {installed_engine_weight_kg:,.0f} kg")
+        print(f"  Airframe weight: {airframe_weight_kg:,.0f} kg")
+    
     # ========== PHASE 3: Fixed Costs (Annual) ==========
+    if verbose:
+        print("\n" + "="*80)
+        print("PHASE 3: FIXED COSTS (ANNUAL)")
+        print("="*80)
+    
     depreciation = calculate_depreciation(
         purchase_price_usd,
         params.depreciation_relative_residual,
         params.depreciation_period_years
     )
+    
+    if verbose:
+        print(f"\nDepreciation:")
+        print(f"  Purchase price: ${purchase_price_usd:,.2f}")
+        print(f"  Residual value ({params.depreciation_relative_residual*100:.0f}%): ${purchase_price_usd * params.depreciation_relative_residual:,.2f}")
+        print(f"  Depreciation period: {params.depreciation_period_years} years")
+        print(f"  Annual depreciation: ${depreciation:,.2f}/year")
     
     interest = calculate_interest(
         purchase_price_usd,
@@ -858,17 +967,44 @@ def calculate_costs(
         params.balloon_fraction
     )
     
+    if verbose:
+        print(f"\nInterest:")
+        print(f"  Purchase price: ${purchase_price_usd:,.2f}")
+        print(f"  Interest rate: {params.interest_rate*100:.2f}%")
+        print(f"  Repayment period: {params.repayment_period_years} years")
+        print(f"  Balloon payment ({params.balloon_fraction*100:.0f}%): ${purchase_price_usd * params.balloon_fraction:,.2f}")
+        print(f"  Annual interest: ${interest:,.2f}/year")
+    
     insurance = calculate_insurance(
         delivery_price_usd,
         params.insurance_factor
     )
     
+    if verbose:
+        print(f"\nInsurance:")
+        print(f"  Delivery price: ${delivery_price_usd:,.2f}")
+        print(f"  Insurance factor: {params.insurance_factor*100:.2f}%")
+        print(f"  Annual insurance: ${insurance:,.2f}/year")
+    
     # ========== PHASE 4: Variable Costs (Annual) ==========
+    if verbose:
+        print("\n" + "="*80)
+        print("PHASE 4: VARIABLE COSTS (ANNUAL)")
+        print("="*80)
+    
     fuel = calculate_fuel(
         aircraft.fuel_weight_kg,
         params.fuel_price_usd,
-        aircraft.flights_per_year
+        flights_per_year
     )
+    
+    if verbose:
+        print(f"\nFuel cost:")
+        print(f"  Fuel per flight: {aircraft.fuel_weight_kg:,.0f} kg")
+        print(f"  Fuel price: ${params.fuel_price_usd:.4f}/kg")
+        print(f"  Flights per year: {flights_per_year:.2f}")
+        print(f"  Annual fuel: ${fuel:,.2f}/year")
+        print(f"  Per flight: ${fuel/flights_per_year:,.2f}/flight")
     
     maintenance = calculate_maintenance(
         aircraft.flight_time_hours,
@@ -880,35 +1016,81 @@ def calculate_costs(
         aircraft.engine_shafts,
         aircraft.takeoff_thrust_per_engine_N,
         aircraft.engine_count,
-        aircraft.flights_per_year,
+        flights_per_year,
         labor_rate_target_year,
         inflation_factor,
         params.maintenance
     )
     
+    if verbose:
+        print(f"\nMaintenance cost:")
+        print(f"  Flight time: {aircraft.flight_time_hours:.2f} hours")
+        print(f"  Airframe weight: {airframe_weight_kg:,.0f} kg")
+        print(f"  Airframe price: ${airframe_price_usd:,.2f}")
+        print(f"  Engine specs: BPR={aircraft.bypass_ratio:.2f}, OPR={aircraft.overall_pressure_ratio:.1f}")
+        print(f"  Compressor stages: {aircraft.compressor_stages}, Shafts: {aircraft.engine_shafts}")
+        print(f"  Labor rate: ${labor_rate_target_year:.2f}/hour")
+        print(f"  Annual maintenance: ${maintenance:,.2f}/year")
+        print(f"  Per flight: ${maintenance/flights_per_year:,.2f}/flight")
+    
     crew = calculate_crew(
         aircraft.block_time_hours,
-        aircraft.flights_per_year,
+        flights_per_year,
         aircraft.cockpit_crew_count,
         aircraft.cabin_crew_count,
         params.cockpit_crew_rate_usd_per_hour,
         params.cabin_crew_rate_usd_per_hour
     )
     
+    if verbose:
+        print(f"\nCrew cost:")
+        print(f"  Block time: {aircraft.block_time_hours:.2f} hours")
+        print(f"  Cockpit crew: {aircraft.cockpit_crew_count} @ ${params.cockpit_crew_rate_usd_per_hour:.2f}/hour")
+        print(f"  Cabin crew: {aircraft.cabin_crew_count} @ ${params.cabin_crew_rate_usd_per_hour:.2f}/hour")
+        print(f"  Flights per year: {flights_per_year:.2f}")
+        print(f"  Annual crew cost: ${crew:,.2f}/year")
+        print(f"  Per flight: ${crew/flights_per_year:,.2f}/flight")
+    
     fees_and_charges = calculate_fees_and_charges(
         aircraft.maximum_takeoff_weight_kg,
         aircraft.payload_weight_kg,
         aircraft.range_nm,
-        aircraft.flights_per_year,
+        flights_per_year,
         params.landing_fee_factor,
         params.navigation_fee_factor,
         params.ground_handling_factor,
         inflation_factor
     )
     
+    if verbose:
+        print(f"\nFees and charges:")
+        print(f"  MTOW: {aircraft.maximum_takeoff_weight_kg:,.0f} kg")
+        print(f"  Payload: {aircraft.payload_weight_kg:,.0f} kg")
+        print(f"  Range: {aircraft.range_nm:.0f} nm")
+        print(f"  Landing fee factor: ${params.landing_fee_factor:.6f}/kg")
+        print(f"  Navigation fee factor: ${params.navigation_fee_factor:.6f}/(nm·√kg)")
+        print(f"  Ground handling factor: ${params.ground_handling_factor:.6f}/kg")
+        print(f"  Annual fees & charges: ${fees_and_charges:,.2f}/year")
+        print(f"  Per flight: ${fees_and_charges/flights_per_year:,.2f}/flight")
+    
     # ========== PHASE 5: Aggregate and Normalize ==========
     # Annual totals
     total_annual = depreciation + interest + insurance + fuel + maintenance + crew + fees_and_charges
+    
+    if verbose:
+        print("\n" + "="*80)
+        print("PHASE 5: COST AGGREGATION & NORMALIZATION")
+        print("="*80)
+        print(f"\nAnnual cost breakdown:")
+        print(f"  Depreciation:     ${depreciation:>12,.2f}  ({depreciation/total_annual*100:>5.1f}%)")
+        print(f"  Interest:         ${interest:>12,.2f}  ({interest/total_annual*100:>5.1f}%)")
+        print(f"  Insurance:        ${insurance:>12,.2f}  ({insurance/total_annual*100:>5.1f}%)")
+        print(f"  Fuel:             ${fuel:>12,.2f}  ({fuel/total_annual*100:>5.1f}%)")
+        print(f"  Maintenance:      ${maintenance:>12,.2f}  ({maintenance/total_annual*100:>5.1f}%)")
+        print(f"  Crew:             ${crew:>12,.2f}  ({crew/total_annual*100:>5.1f}%)")
+        print(f"  Fees & Charges:   ${fees_and_charges:>12,.2f}  ({fees_and_charges/total_annual*100:>5.1f}%)")
+        print(f"  {'-'*50}")
+        print(f"  TOTAL:            ${total_annual:>12,.2f}  (100.0%)")
     
     annual_costs = CostBreakdown(
         depreciation=depreciation,
@@ -923,18 +1105,30 @@ def calculate_costs(
     
     # Per-flight costs
     per_flight_costs = CostBreakdown(
-        depreciation=depreciation / aircraft.flights_per_year,
-        interest=interest / aircraft.flights_per_year,
-        insurance=insurance / aircraft.flights_per_year,
-        fuel=fuel / aircraft.flights_per_year,
-        maintenance=maintenance / aircraft.flights_per_year,
-        crew=crew / aircraft.flights_per_year,
-        fees_and_charges=fees_and_charges / aircraft.flights_per_year,
-        total=total_annual / aircraft.flights_per_year
+        depreciation=depreciation / flights_per_year,
+        interest=interest / flights_per_year,
+        insurance=insurance / flights_per_year,
+        fuel=fuel / flights_per_year,
+        maintenance=maintenance / flights_per_year,
+        crew=crew / flights_per_year,
+        fees_and_charges=fees_and_charges / flights_per_year,
+        total=total_annual / flights_per_year
     )
     
+    if verbose:
+        print(f"\nPer-flight cost breakdown (÷ {flights_per_year:.1f} flights/year):")
+        print(f"  Depreciation:     ${per_flight_costs.depreciation:>10,.2f}")
+        print(f"  Interest:         ${per_flight_costs.interest:>10,.2f}")
+        print(f"  Insurance:        ${per_flight_costs.insurance:>10,.2f}")
+        print(f"  Fuel:             ${per_flight_costs.fuel:>10,.2f}")
+        print(f"  Maintenance:      ${per_flight_costs.maintenance:>10,.2f}")
+        print(f"  Crew:             ${per_flight_costs.crew:>10,.2f}")
+        print(f"  Fees & Charges:   ${per_flight_costs.fees_and_charges:>10,.2f}")
+        print(f"  {'-'*40}")
+        print(f"  TOTAL:            ${per_flight_costs.total:>10,.2f}")
+    
     # Per-hour costs
-    total_flight_hours = aircraft.flights_per_year * aircraft.flight_time_hours
+    total_flight_hours = flights_per_year * aircraft.flight_time_hours
     per_hour_costs = CostBreakdown(
         depreciation=depreciation / total_flight_hours,
         interest=interest / total_flight_hours,
@@ -946,6 +1140,18 @@ def calculate_costs(
         total=total_annual / total_flight_hours
     )
     
+    if verbose:
+        print(f"\nPer-hour cost breakdown (÷ {total_flight_hours:.1f} flight hours/year):")
+        print(f"  Depreciation:     ${per_hour_costs.depreciation:>10,.2f}")
+        print(f"  Interest:         ${per_hour_costs.interest:>10,.2f}")
+        print(f"  Insurance:        ${per_hour_costs.insurance:>10,.2f}")
+        print(f"  Fuel:             ${per_hour_costs.fuel:>10,.2f}")
+        print(f"  Maintenance:      ${per_hour_costs.maintenance:>10,.2f}")
+        print(f"  Crew:             ${per_hour_costs.crew:>10,.2f}")
+        print(f"  Fees & Charges:   ${per_hour_costs.fees_and_charges:>10,.2f}")
+        print(f"  {'-'*40}")
+        print(f"  TOTAL:            ${per_hour_costs.total:>10,.2f}")
+    
     # Pricing breakdown
     pricing = PricingBreakdown(
         engine_price_usd=engine_price_usd,
@@ -956,6 +1162,16 @@ def calculate_costs(
     )
     
     # ========== PHASE 6: Return Comprehensive Results ==========
+    if verbose:
+        print("\n" + "="*80)
+        print("CALCULATION COMPLETE")
+        print("="*80)
+        print(f"\nSummary:")
+        print(f"  Total annual DOC: ${total_annual:,.2f}/year")
+        print(f"  Cost per flight: ${per_flight_costs.total:,.2f}/flight")
+        print(f"  Cost per hour: ${per_hour_costs.total:,.2f}/flight hour")
+        print("\n" + "="*80 + "\n")
+    
     return DOCResult(
         prices=pricing,
         annual=annual_costs,

@@ -159,3 +159,6 @@ Desktop.ini
 
 # Debug files
 debug_*.py
+designtool_test.py
+designTool.py
+imagens_opt/3dview.png

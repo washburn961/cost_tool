@@ -28,7 +28,7 @@ erj_145_xr = ct.AircraftParameters(
     # Utilization
     block_time_hours=hhmmss_to_hours("2:05:00"),                    # Average block time per flight
     flight_time_hours=hhmmss_to_hours("1:34:00"),                   # Average flight time per flight
-    flights_per_year=1, # THIS DOESNT MATTER
+    flights_per_year=None, # THIS DOESNT MATTER
     
     # Weights
     maximum_takeoff_weight_kg=48501 / 2.205,        # MTOW
@@ -65,14 +65,14 @@ fitted_maintenance_params = ct.FITTED_MAINTENANCE_PARAMS
 params = ct.MethodParameters(maintenance=fitted_maintenance_params)
 
 # ========== Calculate Direct Operating Costs ==========
-erj_145_xr_result = ct.calculate_costs(erj_145_xr, params, target_year=2025)
+erj_145_xr_result = ct.calculate_costs(erj_145_xr, params, target_year=2025, verbose=True)
 
-print("\n========== Cost Breakdown (Per Flight) ERJ-145 XR ==========")
-print(f"OEW: {erj_145_xr.operational_empty_weight_kg:.2f} kg - {erj_145_xr.operational_empty_weight_kg * 2.20462:.2f} lbs")
-print(f"MTOW: {erj_145_xr.maximum_takeoff_weight_kg:.2f} kg - {erj_145_xr.maximum_takeoff_weight_kg * 2.20462:.2f} lbs")
-print(f"Fees & Charges:  ${erj_145_xr_result.per_flight.fees_and_charges:,.2f}")
-print(f"Crew:            ${erj_145_xr_result.per_flight.crew:,.2f}")
-print(f"Maintenance:     ${erj_145_xr_result.per_flight.maintenance:,.2f}")
-print(f"Fuel:            ${erj_145_xr_result.per_flight.fuel:,.2f}")
-print(f"Cash Operating Cost Per Flight: ${erj_145_xr_result.per_flight.fees_and_charges + erj_145_xr_result.per_flight.crew + erj_145_xr_result.per_flight.maintenance + erj_145_xr_result.per_flight.fuel:,.2f}")
-print(f"{'='*50}")
+# print("\n========== Cost Breakdown (Per Flight) ERJ-145 XR ==========")
+# print(f"OEW: {erj_145_xr.operational_empty_weight_kg:.2f} kg - {erj_145_xr.operational_empty_weight_kg * 2.20462:.2f} lbs")
+# print(f"MTOW: {erj_145_xr.maximum_takeoff_weight_kg:.2f} kg - {erj_145_xr.maximum_takeoff_weight_kg * 2.20462:.2f} lbs")
+# print(f"Fees & Charges:  ${erj_145_xr_result.per_flight.fees_and_charges:,.2f}")
+# print(f"Crew:            ${erj_145_xr_result.per_flight.crew:,.2f}")
+# print(f"Maintenance:     ${erj_145_xr_result.per_flight.maintenance:,.2f}")
+# print(f"Fuel:            ${erj_145_xr_result.per_flight.fuel:,.2f}")
+# print(f"Cash Operating Cost Per Flight: ${erj_145_xr_result.per_flight.fees_and_charges + erj_145_xr_result.per_flight.crew + erj_145_xr_result.per_flight.maintenance + erj_145_xr_result.per_flight.fuel:,.2f}")
+# print(f"{'='*50}")
